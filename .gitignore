@@ -1,0 +1,34 @@
+# Private evidence and generated output
+*.log
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.ppm
+*.raw
+*.dng
+*.deb
+*.rpm
+*.ko
+*.key
+*.pem
+*.p12
+*.pfx
+*.priv
+*.der
+*.crt
+*.cer
+*.secret
+*.token
+evidence/
+captures/
+build/
+dist/
+.work/
+
+# Common local configuration
+.env
+.env.*
+!.env.example
+*~
+*.swp

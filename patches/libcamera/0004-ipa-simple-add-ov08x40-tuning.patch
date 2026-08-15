@@ -1,0 +1,58 @@
+From: James Alexander <opensource@inspiredexperts.com>
+Date: Fri, 14 Aug 2026 22:00:00 -0600
+Subject: [PATCH 3/3] ipa: simple: add ov08x40 tuning
+
+Add the ov08x40 tuning used on the HP Spectre test system and install it
+with the other simple IPA data.
+
+The matrix and image controls reduce a green-yellow cast and keep webcam
+exposure and gain within practical limits on that machine. The tuning was
+tested under warm indoor lighting but is not lab calibrated.
+
+Build-tested against libcamera base b8910c9a4961 and hardware-tested as part of
+the complete patch set on the target HP Spectre.
+
+Signed-off-by: James Alexander <opensource@inspiredexperts.com>
+---
+diff --git a/src/ipa/simple/data/meson.build b/src/ipa/simple/data/meson.build
+index 92795ee..d994100 100644
+--- a/src/ipa/simple/data/meson.build
++++ b/src/ipa/simple/data/meson.build
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ conf_files = files([
++    'ov08x40.yaml',
+     'uncalibrated.yaml',
+ ])
+ 
+diff --git a/src/ipa/simple/data/ov08x40.yaml b/src/ipa/simple/data/ov08x40.yaml
+new file mode 100644
+index 0000000..aa1b8e0
+--- /dev/null
++++ b/src/ipa/simple/data/ov08x40.yaml
+@@ -0,0 +1,22 @@
++# SPDX-License-Identifier: CC0-1.0
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Ccm:
++      ccms:
++        - ct: 3050
++          ccm: [ 1.12, -0.08, -0.04,
++                -0.05,  1.00,  0.05,
++                -0.02, -0.10,  1.12 ]
++          offsets: [ 0, 0, 0 ]
++  - Adjust:
++      contrast: 1.15
++      gamma: 2.2
++  - Agc:
++      target: 2.3
++      maxAnalogueGain: 3.0
++      maxExposureTimeMs: 33.0
++...
+-- 
+2.46.0

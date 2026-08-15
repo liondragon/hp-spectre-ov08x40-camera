@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: CC0-1.0
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+  - Awb:
+  - Ccm:
+      ccms:
+        - ct: 3050
+          ccm: [ 1.12, -0.08, -0.04,
+                -0.05,  1.00,  0.05,
+                -0.02, -0.10,  1.12 ]
+          offsets: [ 0, 0, 0 ]
+  - Adjust:
+      contrast: 1.15
+      gamma: 2.2
+  - Agc:
+      target: 2.3
+      maxAnalogueGain: 3.0
+      maxExposureTimeMs: 33.0
+...

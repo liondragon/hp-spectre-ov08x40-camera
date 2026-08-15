@@ -1,0 +1,130 @@
+From: James Alexander <opensource@inspiredexperts.com>
+Date: Fri, 14 Aug 2026 22:00:00 -0600
+Subject: [PATCH 2/3] ipa: simple: read AGC limits from tuning
+
+The simple IPA AGC currently uses one target and the full exposure and gain
+ranges reported by the sensor. On the tested ov08x40 setup that produced more
+noise and longer exposures than were useful for a webcam.
+
+Allow tuning to set the histogram target, maximum analogue gain and maximum
+exposure time. Missing values preserve the current behaviour, and configured
+limits are clamped to the sensor's reported range.
+
+Build-tested against libcamera base b8910c9a4961 and hardware-tested as part of
+the complete patch set on the target HP Spectre.
+
+Signed-off-by: James Alexander <opensource@inspiredexperts.com>
+---
+diff --git a/src/ipa/simple/algorithms/agc.cpp b/src/ipa/simple/algorithms/agc.cpp
+index a13a755..fa93d03 100644
+--- a/src/ipa/simple/algorithms/agc.cpp
++++ b/src/ipa/simple/algorithms/agc.cpp
+@@ -8,6 +8,7 @@
+ #include "agc.h"
+ 
+ #include <algorithm>
++#include <chrono>
+ #include <cmath>
+ #include <stdint.h>
+ 
+@@ -15,6 +16,8 @@
+ 
+ #include "control_ids.h"
+ 
++using namespace std::literals::chrono_literals;
++
+ namespace libcamera {
+ 
+ LOG_DEFINE_CATEGORY(IPASoftExposure)
+@@ -62,7 +65,46 @@ static constexpr float kExpProportionalGain = 0.04;
+ static constexpr float kExpMaxStep = 0.15;
+ 
+ Agc::Agc()
++	: exposureOptimal_(kExposureOptimal)
++{
++}
++
++int Agc::init([[maybe_unused]] IPAContext &context, const ValueNode &tuningData)
++{
++	auto target = tuningData["target"].get<double>();
++	if (target.has_value())
++		exposureOptimal_ = std::clamp(target.value(), 1.0, 5.0);
++
++	auto maxAnalogueGain = tuningData["maxAnalogueGain"].get<double>();
++	if (maxAnalogueGain.has_value())
++		maxAnalogueGain_ = std::max(1.0, maxAnalogueGain.value());
++
++	auto maxExposureTimeMs = tuningData["maxExposureTimeMs"].get<double>();
++	if (maxExposureTimeMs.has_value())
++		maxExposureTimeMs_ = std::max(1.0, maxExposureTimeMs.value());
++
++	return 0;
++}
++
++int Agc::configure(IPAContext &context,
++		   [[maybe_unused]] const IPAConfigInfo &configInfo)
+ {
++	if (maxAnalogueGain_.has_value())
++		context.configuration.agc.againMax =
++			std::clamp(maxAnalogueGain_.value(),
++				   context.configuration.agc.againMin,
++				   context.configuration.agc.againMax);
++
++	if (maxExposureTimeMs_.has_value()) {
++		utils::Duration maxExposure = maxExposureTimeMs_.value() * 1.0ms;
++		int32_t maxExposureLines =
++			std::max<int32_t>(context.configuration.agc.exposureMin,
++					  maxExposure / context.configuration.agc.lineDuration);
++		context.configuration.agc.exposureMax =
++			std::min(context.configuration.agc.exposureMax, maxExposureLines);
++	}
++
++	return 0;
+ }
+ 
+ void Agc::updateExposure(IPAContext &context, IPAFrameContext &frameContext, double exposureMSV)
+@@ -70,7 +112,7 @@ void Agc::updateExposure(IPAContext &context, IPAFrameContext &frameContext, dou
+ 	int32_t &exposure = frameContext.sensor.exposure;
+ 	double &again = frameContext.sensor.gain;
+ 
+-	double error = kExposureOptimal - exposureMSV;
++	double error = exposureOptimal_ - exposureMSV;
+ 
+ 	if (std::abs(error) <= kExposureSatisfactory)
+ 		return;
+diff --git a/src/ipa/simple/algorithms/agc.h b/src/ipa/simple/algorithms/agc.h
+index 112d9f5..501252f 100644
+--- a/src/ipa/simple/algorithms/agc.h
++++ b/src/ipa/simple/algorithms/agc.h
+@@ -7,6 +7,8 @@
+ 
+ #pragma once
+ 
++#include <optional>
++
+ #include "algorithm.h"
+ 
+ namespace libcamera {
+@@ -19,6 +21,9 @@ public:
+ 	Agc();
+ 	~Agc() = default;
+ 
++	int init(IPAContext &context, const ValueNode &tuningData) override;
++	int configure(IPAContext &context,
++		      const IPAConfigInfo &configInfo) override;
+ 	void process(IPAContext &context, const uint32_t frame,
+ 		     IPAFrameContext &frameContext,
+ 		     const SwIspStats *stats,
+@@ -26,6 +31,10 @@ public:
+ 
+ private:
+ 	void updateExposure(IPAContext &context, IPAFrameContext &frameContext, double exposureMSV);
++
++	double exposureOptimal_;
++	std::optional<double> maxAnalogueGain_;
++	std::optional<double> maxExposureTimeMs_;
+ };
+ 
+ } /* namespace ipa::soft::algorithms */
+-- 
+2.46.0

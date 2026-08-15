@@ -1,0 +1,48 @@
+From: James Alexander <opensource@inspiredexperts.com>
+Date: Fri, 14 Aug 2026 22:00:00 -0600
+Subject: [PATCH] libcamera: sensor: add ov08x40 properties
+
+The ov08x40 sensor helper is already present, but the sensor has no static
+properties. Add its 700 nm unit-cell size, test-pattern mapping and two-frame
+delays.
+
+The unit-cell size comes from OmniVision's OV08X product information. The delay
+values are experimental and need wider hardware validation.
+
+Build-tested against libcamera base b8910c9a4961 and hardware-tested as part of
+the complete patch set on the target HP Spectre.
+
+Signed-off-by: James Alexander <opensource@inspiredexperts.com>
+---
+diff --git a/src/libcamera/sensor/camera_sensor_properties.cpp b/src/libcamera/sensor/camera_sensor_properties.cpp
+index 819f07b..c31f9e7 100644
+--- a/src/libcamera/sensor/camera_sensor_properties.cpp
++++ b/src/libcamera/sensor/camera_sensor_properties.cpp
+@@ -510,6 +510,25 @@ const CameraSensorProperties *CameraSensorProperties::get(const std::string &sen
+ 				.hblankDelay = 2
+ 			},
+ 		} },
++		{ "ov08x40", {
++			.unitCellSize = { 700, 700 },
++			.testPatternModes = {
++				{ controls::draft::TestPatternModeOff, 0 },
++				{ controls::draft::TestPatternModeColorBars, 1 },
++				/*
++				 * No corresponding test pattern mode for:
++				 * 2: "Vertical Color Bar Type 2"
++				 * 3: "Vertical Color Bar Type 3"
++				 * 4: "Vertical Color Bar Type 4"
++				 */
++			},
++			.sensorDelays = {
++				.exposureDelay = 2,
++				.gainDelay = 2,
++				.vblankDelay = 2,
++				.hblankDelay = 2
++			},
++		} },
+ 		{ "ov8858", {
+ 			.unitCellSize = { 1120, 1120 },
+ 			.testPatternModes = {
+-- 
+2.46.0
