@@ -1,6 +1,6 @@
 From: James Alexander <opensource@inspiredexperts.com>
 Date: Fri, 14 Aug 2026 22:00:00 -0600
-Subject: [PATCH 2/3] ipa: simple: read AGC limits from tuning
+Subject: [PATCH 2/3] ipa: simple: agc: Read limits from tuning
 
 The simple IPA AGC currently uses one target and the full exposure and gain
 ranges reported by the sensor. On the tested ov08x40 setup that produced more

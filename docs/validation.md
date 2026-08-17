@@ -4,13 +4,13 @@ Last checked: August 16, 2026
 
 ## Source bases
 
-- Linux: `dac3e89a2c90c2feeb471e1f22a2512ad424b792`
+- Linux: `fd923b32d7614047c8b2acecae3915ec94f7afab`
 - libcamera: `b8910c9a4961b992a6c5bbe836e2cd1c30626e31`
 
 ## Passed
 
-- Both Linux patches apply cleanly to the recorded Linux base.
-- `drivers/media/i2c/ov08x40.o` compiles in the recorded Linux tree.
+- Both Linux patches apply cleanly to the current Linux revision listed above.
+- `drivers/media/i2c/ov08x40.o` compiles in the recorded Linux tree with `W=1`.
 - `drivers/platform/x86/intel/int3472/discrete.o` compiles.
 - `drivers/platform/x86/intel/int3472/discrete_quirks.o` compiles.
 - Both Linux patches pass `scripts/checkpatch.pl --strict` with no findings.
@@ -28,7 +28,8 @@ kernel `7.0.0-29-generic` on the target HP Spectre.
 - The three rebuilt modules were signed with an enrolled Secure Boot key,
   installed, added to the initramfs, and loaded after reboot.
 - The loaded module source versions matched the rebuilt files.
-- The ov08x40 sensor was detected, libcamera reported one camera, and the
+- The laptop completed 25 consecutive reboots with the patched modules. Every
+  boot detected the ov08x40 sensor, libcamera reported one camera, and the
   earlier `-121` sensor probe error did not recur.
 - The patched libcamera build captured 60 consecutive 3848x2416 frames at
   30 frames per second through the simple pipeline.

@@ -1,6 +1,6 @@
 From: James Alexander <opensource@inspiredexperts.com>
 Date: Fri, 14 Aug 2026 22:00:00 -0600
-Subject: [PATCH 3/3] ipa: simple: add ov08x40 tuning
+Subject: [PATCH 3/3] ipa: simple: Add OV08X40 tuning
 
 Add the ov08x40 tuning used on the HP Spectre test system and install it
 with the other simple IPA data.

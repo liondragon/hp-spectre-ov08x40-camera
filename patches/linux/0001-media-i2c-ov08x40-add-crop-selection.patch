@@ -10,9 +10,9 @@ Record the crop used by each mode and return native size, crop bounds and
 the active crop through get_selection(). Initialise the try crop when the
 subdevice is opened as well.
 
-Compile-tested against Linux base dac3e89a2c90. Hardware-tested with the
-full patch set on an HP Spectre x360 14-eu0xxx running Ubuntu
-7.0.0-29-generic.
+Compile-tested against Linux base fd923b32d761. Hardware-tested with the
+full patch set across 25 consecutive reboots on an HP Spectre x360
+14-eu0xxx running Ubuntu 7.0.0-29-generic.
 
 Signed-off-by: James Alexander <opensource@inspiredexperts.com>
 ---

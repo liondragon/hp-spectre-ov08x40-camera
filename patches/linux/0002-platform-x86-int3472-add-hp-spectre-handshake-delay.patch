@@ -10,8 +10,9 @@ Keep the existing delay for other OVTI08F4 systems. Add a reusable
 handshake-delay field to the discrete-device quirks and set it only for the
 affected HP Spectre family through DMI matching.
 
-Compile-tested against Linux base dac3e89a2c90. Hardware-tested with the
-full patch set on the affected laptop running Ubuntu 7.0.0-29-generic.
+Compile-tested against Linux base fd923b32d761. Hardware-tested with the
+full patch set across 25 consecutive reboots on the affected laptop running
+Ubuntu 7.0.0-29-generic; the sensor probed successfully on every boot.
 
 Signed-off-by: James Alexander <opensource@inspiredexperts.com>
 ---

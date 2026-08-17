@@ -1,6 +1,7 @@
 From: James Alexander <opensource@inspiredexperts.com>
 Date: Fri, 14 Aug 2026 22:00:00 -0600
-Subject: [PATCH] libcamera: sensor: add ov08x40 properties
+Subject: [PATCH] libcamera: camera_sensor_properties: Add OmniVision OV08X40
+ properties
 
 The ov08x40 sensor helper is already present, but the sensor has no static
 properties. Add its 700 nm unit-cell size, test-pattern mapping and two-frame
