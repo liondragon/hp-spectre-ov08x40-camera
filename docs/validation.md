@@ -1,6 +1,26 @@
 # Validation Record
 
-Last checked: August 16, 2026
+Last checked: September 12, 2026
+
+## Current preparation
+
+- The Linux crop-selection patch and the accepted global 200 ms INT3472
+  handshake-delay patch were backported to Ubuntu 7.0.14 source package
+  `7.0.0-31.31`.
+- The ov08x40 and INT3472 modules build for the exact
+  `7.0.0-31-generic` ABI and report matching `vermagic`.
+- The prepared libcamera sensor-properties v2 applies to upstream commit
+  `87c7285663aaad7608fdc18d5216ec6811c685c7` and a simple/softisp build
+  completes successfully.
+- The signed kernel backport loaded from the override path on the target
+  laptop across 25 consecutive reboots. Every boot had no ov08x40 `-121`
+  probe error and enumerated one internal camera.
+- A discarded 20-frame 3848x2416 capture completed at 30 frames per second,
+  and PipeWire exposed one `Built-in Front Camera` source. No image was
+  retained.
+- After refreshing PipeWire, WirePlumber, and the desktop portals, GNOME
+  Snapshot opened an active stream from that source. Visual color and exposure
+  quality still require owner observation rather than automated validation.
 
 ## Source bases
 

@@ -17,7 +17,8 @@ This is hands-on Linux camera work, not a one-click installer.
 - HP Spectre x360 2-in-1 Laptop 14-eu0xxx
 - OVTI08F4 / OmniVision ov08x40 camera
 - Ubuntu 26.04 LTS
-- Linux `7.0.0-29-generic`
+- Linux `7.0.0-29-generic` (original validation); current Ubuntu kernel
+  backports are recorded in [validation.md](docs/validation.md)
 - Intel IPU6 and libcamera simple IPA
 
 ## What is included
@@ -25,11 +26,11 @@ This is hands-on Linux camera work, not a one-click installer.
 ### Linux kernel
 
 - [ov08x40 crop-selection patch](patches/linux/0001-media-i2c-ov08x40-add-crop-selection.patch)
-- [HP-specific INT3472 handshake-delay patch](patches/linux/0002-platform-x86-int3472-add-hp-spectre-handshake-delay.patch)
+- [INT3472 200 ms handshake-delay patch](patches/linux/0002-platform-x86-int3472-add-hp-spectre-handshake-delay.patch)
 
-The crop patch gives libcamera the sensor rectangles it asks for. The INT3472
-patch keeps the normal 45 ms delay everywhere else and uses 150 ms only on the
-matching HP Spectre family.
+The crop patch gives libcamera the sensor rectangles it asks for. The accepted
+INT3472 patch raises the default handshake delay to 200 ms for systems that use
+that power path; it supersedes the original HP-specific 150 ms submission.
 
 ### libcamera
 
@@ -45,8 +46,9 @@ libcamera upstream.
 
 1. Read the [installation and rollback guide](docs/install.md).
 2. Run `scripts/check-system.sh` on the HP laptop.
-3. Use `scripts/apply-patches.sh --check` against clean Linux and libcamera
-   source trees before applying anything.
+3. Check each patch against the exact base recorded in
+   [patches/README.md](patches/README.md) before applying anything. The original
+   three-patch IPA tuning series does not apply unchanged to current libcamera.
 4. Build first. Do not install a module that failed its checks or was built for
    a different kernel.
 5. After rebooting, run `scripts/verify-camera.sh`.
@@ -56,11 +58,11 @@ The exact source bases and current test results are in
 
 ## Status
 
-This patch set applies and builds against the source revisions listed in
-[validation.md](docs/validation.md). The exact patch set was tested on the
-target laptop with Secure Boot enabled, including kernel module loading,
-libcamera capture, PipeWire, and GNOME Snapshot. The included color profile
-improves warm indoor lighting but is not calibrated for every camera or room.
+The original patch set was tested on the target laptop with Secure Boot
+enabled, including kernel module loading, libcamera capture, PipeWire, and
+GNOME Snapshot. Current patch preparation and test results are recorded in
+[validation.md](docs/validation.md). The included color profile improves warm
+indoor lighting but is not calibrated for every camera or room.
 
 ## Upstream status
 
