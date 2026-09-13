@@ -20,7 +20,7 @@ printf 'Product name: %s\n' "$product"
 if [[ "$vendor" == "HP" && "$product" == "HP Spectre x360 2-in-1 Laptop 14-eu0xxx" ]]; then
 	echo "DMI match: yes"
 else
-	echo "DMI match: no - do not install the HP timing patch without review"
+	echo "DMI match: no - this install path was validated only on the HP Spectre/OVTI08F4 setup"
 fi
 
 if compgen -G '/sys/bus/acpi/devices/OVTI08F4:*' >/dev/null; then

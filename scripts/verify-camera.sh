@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "Kernel: $(uname -r)"
 
-for module_name in ov08x40 intel_skl_int3472_discrete; do
+for module_name in ov08x40 intel_skl_int3472_common intel_skl_int3472_discrete; do
 	echo
 	echo "$module_name"
 	modinfo "$module_name" | awk -F: '/^(filename|version|signer):/ { sub(/^[[:space:]]+/, "", $2); print $1 ": " $2 }'

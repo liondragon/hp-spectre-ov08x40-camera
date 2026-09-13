@@ -1,0 +1,168 @@
+From: James Alexander <opensource@inspiredexperts.com>
+Date: Sat, 12 Sep 2026 19:33:29 -0600
+Subject: [RFC PATCH 1/2] ipa: libipa: agc_mean_luminance: Add exposure
+ tolerance
+
+Small alternating exposure estimates can keep the adaptive filter moving
+around its target and produce visible brightness oscillation with delayed
+and quantized sensor controls.
+
+Add an optional relative exposure tolerance. It defaults to zero so existing
+common-AGC users retain their current behaviour. Exposure-compensation changes
+rebase the filtered exposure, while exposure and constraint mode changes reset
+it, so explicit controls remain responsive.
+
+A 2% tolerance was tested on an OV08X40 using the simple pipeline and softisp.
+Together with corrected sensor delays, it held analogue gain steady and removed
+a roughly 2.2% periodic luminance pulse.
+
+Signed-off-by: James Alexander <opensource@inspiredexperts.com>
+---
+ src/ipa/libipa/agc_mean_luminance.cpp | 61 +++++++++++++++++++++++----
+ src/ipa/libipa/agc_mean_luminance.h   |  8 +++-
+ 2 files changed, 59 insertions(+), 10 deletions(-)
+
+diff --git a/src/ipa/libipa/agc_mean_luminance.cpp b/src/ipa/libipa/agc_mean_luminance.cpp
+index 7283324..1a91b5e 100644
+--- a/src/ipa/libipa/agc_mean_luminance.cpp
++++ b/src/ipa/libipa/agc_mean_luminance.cpp
+@@ -178,7 +178,10 @@ static constexpr unsigned int kDefaultLuxLevel = 500;
+  */
+ 
+ AgcMeanLuminance::AgcMeanLuminance()
+-	: filteredExposure_(0s), luxWarningEnabled_(true), frameCount_(0)
++	: exposureTolerance_(0.0), filteredExposure_(0s),
++	  luxWarningEnabled_(true), frameCount_(0),
++	  controlStateInitialized_(false), lastExposureCompensation_(1.0),
++	  lastConstraintModeIndex_(0), lastExposureModeIndex_(0)
+ {
+ }
+ 
+@@ -356,6 +359,7 @@ void AgcMeanLuminance::configure(utils::Duration lineDuration,
+ 	luxWarningEnabled_ = true;
+ 	filteredExposure_ = 0s;
+ 	frameCount_ = 0;
++	controlStateInitialized_ = false;
+ }
+ 
+ /**
+@@ -363,10 +367,13 @@ void AgcMeanLuminance::configure(utils::Duration lineDuration,
+  * \param[in] tuningData the ValueNode representing the tuning data
+  *
+  * This function parses tuning data to build the list of allowed values for the
+- * AeConstraintMode and AeExposureMode controls. Those tuning data must provide
+- * the data in a specific format; the Agc algorithm's tuning data should contain
+- * a dictionary called AeConstraintMode containing per-mode setting dictionaries
+- * with the key being a value from \ref controls::AeConstraintModeNameValueMap.
++ * AeConstraintMode and AeExposureMode controls. The optional
++ * relativeExposureTolerance value holds exposure steady when the relative
++ * target change is smaller than the configured value; it defaults to zero.
++ * The tuning data must otherwise provide data in a specific format; the Agc
++ * algorithm's tuning data should contain a dictionary called AeConstraintMode
++ * containing per-mode setting dictionaries with the key being a value from
++ * \ref controls::AeConstraintModeNameValueMap.
+  * The yTarget can either be provided as single value or as array in which case
+  * it is interpreted as a PWL mapping lux levels to yTarget values. Each mode
+  * dict may contain either a "lower" or "upper" key or both, for example:
+@@ -417,6 +424,13 @@ int AgcMeanLuminance::parseTuningData(const ValueNode &tuningData)
+ {
+ 	int ret;
+ 
++	exposureTolerance_ = tuningData["relativeExposureTolerance"].get<double>(0.0);
++	if (exposureTolerance_ < 0.0 || exposureTolerance_ >= 1.0) {
++		LOG(AgcMeanLuminance, Error)
++			<< "Relative exposure tolerance must be in the range [0, 1)";
++		return -EINVAL;
++	}
++
+ 	ret = parseRelativeLuminanceTarget(tuningData);
+ 	if (ret)
+ 		return ret;
+@@ -578,15 +592,28 @@ double AgcMeanLuminance::effectiveYTarget(double lux, double exposureCompensatio
+ /**
+  * \brief Apply a filter on the exposure value to limit the speed of changes
+  * \param[in] exposureValue The target exposure from the AGC algorithm
++ * \param[in] reset Whether to reset the filter to the target exposure
+  *
+  * The speed of the filter is adaptive, and will produce the target quicker
+- * during startup, or when the target exposure is within 20% of the most recent
+- * filter output.
++ * during startup, when the filter is reset, or when the target exposure is
++ * within 20% of the most recent filter output. Once startup is complete,
++ * changes below the configured exposure tolerance are ignored to avoid
++ * oscillating around the target.
+  *
+  * \return The filtered exposure
+  */
+-utils::Duration AgcMeanLuminance::filterExposure(utils::Duration exposureValue)
++utils::Duration AgcMeanLuminance::filterExposure(utils::Duration exposureValue,
++						 bool reset)
+ {
++	if (reset) {
++		filteredExposure_ = exposureValue;
++		return filteredExposure_;
++	}
++
++	if (frameCount_ >= kNumStartupFrames && filteredExposure_ != 0s &&
++	    utils::abs_diff(exposureValue / filteredExposure_, 1.0) < exposureTolerance_)
++		return filteredExposure_;
++
+ 	double speed = 0.2;
+ 
+ 	/* Adapt instantly if we are in startup phase. */
+@@ -659,6 +686,22 @@ utils::Duration AgcMeanLuminance::filterExposure(utils::Duration exposureValue)
+ AgcMeanLuminance::Result
+ AgcMeanLuminance::calculateNewEv(const Params &params)
+ {
++	bool exposureCompensationChanged = exposureTolerance_ > 0.0 &&
++		controlStateInitialized_ &&
++		params.exposureCompensation != lastExposureCompensation_;
++	bool modeChanged = exposureTolerance_ > 0.0 && controlStateInitialized_ &&
++		(params.constraintModeIndex != lastConstraintModeIndex_ ||
++		 params.exposureModeIndex != lastExposureModeIndex_);
++
++	if (exposureCompensationChanged && filteredExposure_ != 0s)
++		filteredExposure_ *= params.exposureCompensation /
++				     lastExposureCompensation_;
++
++	controlStateInitialized_ = true;
++	lastExposureCompensation_ = params.exposureCompensation;
++	lastConstraintModeIndex_ = params.constraintModeIndex;
++	lastExposureModeIndex_ = params.exposureModeIndex;
++
+ 	/*
+ 	 * The pipeline handler should validate that we have received an allowed
+ 	 * value for AeExposureMode.
+@@ -695,7 +738,7 @@ AgcMeanLuminance::calculateNewEv(const Params &params)
+ 	 * We filter the exposure value to make sure changes are not too jarring
+ 	 * from frame to frame.
+ 	 */
+-	newExposureValue = filterExposure(newExposureValue);
++	newExposureValue = filterExposure(newExposureValue, modeChanged);
+ 
+ 	frameCount_++;
+ 	return { exposureModeHelper.splitExposure(newExposureValue), yTarget };
+diff --git a/src/ipa/libipa/agc_mean_luminance.h b/src/ipa/libipa/agc_mean_luminance.h
+index f799618..15df959 100644
+--- a/src/ipa/libipa/agc_mean_luminance.h
++++ b/src/ipa/libipa/agc_mean_luminance.h
+@@ -86,12 +86,18 @@ private:
+ 	int parseExposureModes(const ValueNode &tuningData);
+ 	double estimateInitialGain(const Traits &traits, double yTarget) const;
+ 	double constraintClampGain(const Params &params, double gain) const;
+-	utils::Duration filterExposure(utils::Duration exposureValue);
++	utils::Duration filterExposure(utils::Duration exposureValue,
++				       bool reset);
+ 
++	double exposureTolerance_;
+ 	utils::Duration filteredExposure_;
+ 	mutable bool luxWarningEnabled_;
+ 	Pwl relativeLuminanceTarget_;
+ 	uint64_t frameCount_;
++	bool controlStateInitialized_;
++	double lastExposureCompensation_;
++	uint32_t lastConstraintModeIndex_;
++	uint32_t lastExposureModeIndex_;
+ 
+ 	std::vector<AgcConstraint> additionalConstraints_;
+ 	std::map<int32_t, std::vector<AgcConstraint>> constraintModes_;

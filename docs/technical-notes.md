@@ -3,12 +3,10 @@
 ## INT3472 power timing
 
 On the affected system, the OVTI08F4 sensor failed to read its chip ID with
-error `-121` when the existing 45 ms handshake delay was used. Increasing the
-delay to 150 ms allowed it to probe.
-
-The patch does not raise the delay for every OVTI08F4 camera. It adds a quirk
-field and applies 150 ms only when DMI identifies the HP Spectre x360
-14-eu0xxx family.
+error `-121` when the existing 45 ms handshake delay was used. A 150 ms
+machine-specific delay first demonstrated the timing problem. The accepted
+upstream fix instead raises the INT3472 handshake delay to 200 ms for every
+sensor that uses this power sequence.
 
 ## ov08x40 crop selection
 
@@ -25,36 +23,48 @@ The ov08x40 sensor helper was merged upstream in libcamera commit
 `0a1cff8bba3d5ca871f6218ab32869f7c90bdc71`. This repository only adds the
 remaining static sensor properties.
 
-Those properties include a 700 nm unit-cell size, the supported color-bar test
-pattern, and two-frame delays. The unit-cell size comes from OmniVision's OV08X
-product information. The delays are experimental and need wider hardware
-validation.
+Those properties include the documented 702 nm unit-cell size and supported
+color-bar test patterns. Step-response testing measured two-frame exposure and
+analogue-gain delays. The blanking controls retain the generic two-frame values.
 
-## Simple IPA tuning
+## automatic exposure stability
 
-The simple IPA already has Adjust and AGC algorithms, but it could not read
-these defaults and limits from YAML. The patches add optional values for:
+The common mean-luminance AGC can continue making small alternating exposure
+corrections near its target. Combined with delayed and quantized sensor
+controls, those corrections produced a visible brightness pulse on this
+camera. The prepared common AGC patch adds an optional relative exposure
+tolerance, disabled by default, and the ov08x40 tuning enables it at 2%.
+Exposure-compensation changes rebase the filtered exposure, while exposure and
+constraint mode changes reset it, so explicit controls remain responsive.
 
-- gamma, contrast and saturation;
-- the AGC histogram target;
-- maximum analogue gain;
-- maximum exposure time.
+Correct sensor delays and the settling tolerance are separate changes. Neither
+eliminated the pulse alone in testing; together they held analogue gain steady
+while retaining normal response to an exposure-compensation change.
 
-When those keys are missing, existing tuning files keep the old behaviour.
+## softisp tuning
 
-The included ov08x40 values are:
+The current softisp IPA uses the common AGC implementation and fixed Adjust
+defaults. The tuning leaves exposure, gain, contrast, gamma, and target
+luminance at those existing defaults, while enabling the measured 2% settling
+tolerance. It enables automatic white balance and retains the tested 3050 K
+color-correction matrix.
 
-```text
-Maximum exposure: 33 ms
-Maximum analogue gain: 3.0
-AGC target: 2.3
-Contrast: 1.15
-Gamma: 2.2
-```
+The original simple-IPA tuning series carried `contrast`, `gamma`,
+`maxAnalogueGain`, and `maxExposureTimeMs` keys through proposed parser
+changes. Current softisp does not parse those keys: its Adjust algorithm uses
+runtime controls and common AGC derives hard limits from sensor controls. The
+current tuning therefore cannot preserve the old 1.15 default contrast or 3x
+gain ceiling merely by copying those fields.
 
-On the target laptop, the color-correction matrix and automatic white balance
-substantially reduced a green-yellow cast under 2700 K LED lighting. The values
-are practical webcam tuning, not calibrated tuning for every unit.
+This ownership split matters for follow-up work. Sensor-specific luminance and
+constraint curves belong in the OV08X40 tuning. A configurable default contrast
+belongs in the common softisp Adjust algorithm. Exposure settling remains in
+common AGC, with per-sensor opt-in through tuning. Keeping those changes
+separate avoids hiding image-quality policy inside the anti-oscillation fix.
+
+On the target laptop, that matrix and automatic white balance substantially
+reduced a green-yellow cast under 2700 K LED lighting. This is practical tuning
+from one unit and lighting setup, not a laboratory calibration for every unit.
 
 ## Desktop routing
 

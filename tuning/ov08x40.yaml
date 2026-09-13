@@ -13,10 +13,6 @@ algorithms:
                 -0.02, -0.10,  1.12 ]
           offsets: [ 0, 0, 0 ]
   - Adjust:
-      contrast: 1.15
-      gamma: 2.2
   - Agc:
-      target: 2.3
-      maxAnalogueGain: 3.0
-      maxExposureTimeMs: 33.0
+      relativeExposureTolerance: 0.02
 ...

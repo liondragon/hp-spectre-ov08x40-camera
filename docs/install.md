@@ -11,7 +11,7 @@ Run:
 ./scripts/check-system.sh
 ```
 
-The INT3472 patch currently matches:
+This repository has been validated on:
 
 ```text
 System vendor: HP
@@ -19,14 +19,17 @@ Product name: HP Spectre x360 2-in-1 Laptop 14-eu0xxx
 Camera ACPI ID: OVTI08F4
 ```
 
-Do not install that patch on a different model without reviewing its DMI match
-and power requirements.
+The current INT3472 patch raises the handshake delay globally for sensors that
+use that power sequence; it is not HP- or DMI-specific. The remaining patches
+and these installation steps are validated only on the machine above. Review
+the camera hardware and source compatibility before using them elsewhere.
 
 ## 2. Get matching source trees
 
-Use Linux source that matches the kernel you will boot. For upstream review,
-use a current Linux tree. For a local Ubuntu module, use the matching Ubuntu
-kernel source whenever possible.
+These installation steps use the matching Ubuntu kernel source for the kernel
+you will boot. The helper below applies the complete local-install set; it is
+not an upstream-submission helper. For upstream review, use a current Linux
+tree and check only the standalone crop-selection patch.
 
 Clone libcamera from its official repository:
 
@@ -34,21 +37,35 @@ Clone libcamera from its official repository:
 git clone https://git.libcamera.org/libcamera/libcamera.git
 ```
 
-Keep both trees clean before applying anything.
+Keep both trees clean before applying anything. A Git worktree is preferred.
+The helper also supports an extracted, non-Git Linux source package, but it
+cannot verify that such a tree is pristine; keep a disposable copy or backup
+for rollback.
 
-## 3. Check and apply the patches
+## 3. Check and apply the local-install patches
+
+Set the path to this repository once; later commands may run from other source
+trees:
+
+```bash
+camera_repo=/path/to/hp-spectre-ov08x40-camera
+```
 
 Check without changing either tree:
 
 ```bash
-./scripts/apply-patches.sh --check /path/to/linux /path/to/libcamera
+"$camera_repo/scripts/apply-patches.sh" --check /path/to/linux /path/to/libcamera
 ```
 
 Apply after the check succeeds:
 
 ```bash
-./scripts/apply-patches.sh --apply /path/to/linux /path/to/libcamera
+"$camera_repo/scripts/apply-patches.sh" --apply /path/to/linux /path/to/libcamera
 ```
+
+The included INT3472 patch is the tested Ubuntu 7.0.14 backport of Hans de
+Goede's accepted 200 ms change. It is not the already-accepted upstream mail
+patch and should not be submitted upstream.
 
 ## 4. Build the kernel modules
 
@@ -102,9 +119,13 @@ The libcamera patches use Meson and Ninja:
 ```bash
 cd /path/to/libcamera
 meson setup build --prefix=/usr/local \
-  -Dpipelines=simple -Dipas=simple
+  -Dpipelines=simple -Dipas=softisp -Dsoftisp-gpu=disabled -Dtest=true
 meson compile -C build
 ```
+
+The GPU softisp backend is disabled because it produced horizontal corruption
+at 1280x720 on the tested IPU6 path. The CPU backend produced a clean frame at
+the same output size.
 
 Test from the build tree first if possible. A system-wide `/usr/local` install
 can take precedence over distribution libraries and affect every camera app.
@@ -116,7 +137,29 @@ sudo meson install -C build
 sudo ldconfig
 ```
 
-## 6. Route desktop apps through libcamera
+## 6. Allow CPU softisp buffer allocation
+
+The CPU softisp path allocates buffers from `/dev/dma_heap`. Install the
+included udev rule and reload it:
+
+```bash
+sudo install -m 0644 "$camera_repo/config/99-libcamera-dma-heap.rules" \
+  /etc/udev/rules.d/99-libcamera-dma-heap.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=dma_heap
+```
+
+Confirm that your account belongs to the `video` group and that the heap
+devices are group-readable and group-writable:
+
+```bash
+id -nG
+find /dev/dma_heap -maxdepth 1 -type c -printf '%M %G %p\n'
+```
+
+If the account was just added to `video`, sign out and back in before testing.
+
+## 7. Route desktop apps through libcamera
 
 Create `~/.config/wireplumber/wireplumber.conf.d/99-libcamera-only.conf`:
 
@@ -136,10 +179,10 @@ systemctl --user restart pipewire wireplumber \
   xdg-desktop-portal xdg-desktop-portal-gnome
 ```
 
-## 7. Verify
+## 8. Verify
 
 ```bash
-./scripts/verify-camera.sh
+"$camera_repo/scripts/verify-camera.sh"
 ```
 
 Then test the camera in one desktop app.
@@ -161,6 +204,14 @@ Remove the local libcamera install using the build tree:
 ```bash
 sudo ninja -C /path/to/libcamera/build uninstall
 sudo ldconfig
+```
+
+Remove the dma-heap rule if it was added for this setup:
+
+```bash
+sudo unlink /etc/udev/rules.d/99-libcamera-dma-heap.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=dma_heap
 ```
 
 Remove the WirePlumber override and restart the user services. Reboot to load

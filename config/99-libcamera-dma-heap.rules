@@ -1,0 +1,2 @@
+# Permit local camera users to allocate software-ISP dma-bufs.
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"

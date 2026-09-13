@@ -1,0 +1,59 @@
+From: James Alexander <opensource@inspiredexperts.com>
+Date: Sat, 12 Sep 2026 19:33:47 -0600
+Subject: [RFC PATCH 2/2] ipa: softisp: Add OV08X40 tuning
+
+Add the OV08X40 tuning used on the HP Spectre test system and install it with
+the other softisp data.
+
+The color correction matrix reduced a green-yellow cast during live testing
+under warm indoor lighting. Enable the tested 2% relative exposure tolerance
+to prevent small periodic exposure oscillations. Keep the existing Adjust and
+common AGC target defaults rather than carrying obsolete controls from the
+earlier simple IPA series.
+
+This is practical tuning for the tested camera and lighting, not a laboratory
+calibration for every unit.
+
+Signed-off-by: James Alexander <opensource@inspiredexperts.com>
+---
+ src/ipa/softisp/data/meson.build  |  1 +
+ src/ipa/softisp/data/ov08x40.yaml | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 src/ipa/softisp/data/ov08x40.yaml
+
+diff --git a/src/ipa/softisp/data/meson.build b/src/ipa/softisp/data/meson.build
+index fd9aa0f..b7ae471 100644
+--- a/src/ipa/softisp/data/meson.build
++++ b/src/ipa/softisp/data/meson.build
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ conf_files = files([
++    'ov08x40.yaml',
+     'uncalibrated.yaml',
+ ])
+ 
+diff --git a/src/ipa/softisp/data/ov08x40.yaml b/src/ipa/softisp/data/ov08x40.yaml
+new file mode 100644
+index 0000000..2257b25
+--- /dev/null
++++ b/src/ipa/softisp/data/ov08x40.yaml
+@@ -0,0 +1,18 @@
++# SPDX-License-Identifier: CC0-1.0
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Ccm:
++      ccms:
++        - ct: 3050
++          ccm: [ 1.12, -0.08, -0.04,
++                -0.05,  1.00,  0.05,
++                -0.02, -0.10,  1.12 ]
++          offsets: [ 0, 0, 0 ]
++  - Adjust:
++  - Agc:
++      relativeExposureTolerance: 0.02
++...
